@@ -44,7 +44,7 @@ public class App
     {
     	App app = new App();
 //    	app.getAllStockes();
-    	app.downloadStock("002646", "sz");
+//    	app.downloadStock("002646", "sz");
 //    	try {
 //			app.downloadAllStockes();
 //		} catch (IOException e) {
@@ -53,6 +53,7 @@ public class App
 //    	app.parseStockFile();
 //    	app.getStockFromSinal();
 //    	app.getAllWeek(20141229, 20151204);
+    	app.getWorkEndDate(20151221, 10);
     }
     
     public App(){}
@@ -303,5 +304,10 @@ public class App
     	}
 //    	Calendar cal = Calendar.getInstance();
 //    	System.out.printf("%d,%d,%d\n", cal.get(Calendar.DAY_OF_WEEK), Calendar.MONDAY, Calendar.FRIDAY);
+    }
+    
+    public void getWorkEndDate(int startDate, int dayNum) {
+    	int endDate = DateUtil.getWorkEndDate(startDate, dayNum);
+    	System.out.println(endDate);
     }
 }

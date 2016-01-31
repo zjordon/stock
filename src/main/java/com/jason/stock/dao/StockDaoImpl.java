@@ -27,7 +27,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.ResultSetExtractor;
 
+import com.jason.stock.bean.ChipInLog;
 import com.jason.stock.bean.HisMarket;
+import com.jason.stock.bean.UpdateChipInLog;
 import com.jason.stock.http.core.CloseableHttpResponseExtractor;
 import com.jason.stock.http.core.DefaultGetHttpDataSource;
 import com.jason.stock.http.core.HttpTemplate;
@@ -35,7 +37,7 @@ import com.jason.stock.util.DateUtil;
 import com.jason.stock.util.StockFileUtil;
 
 /**
- * @author lenovo
+ * @author jasonzhang
  *
  */
 public class StockDaoImpl implements StockDao {
@@ -54,6 +56,10 @@ public class StockDaoImpl implements StockDao {
 	private final static String INSERT_STOCK = "insert into st_stock(id, type, stock_name) values(?, ?, ?)";
 	private final static String SELECT_ALL_STOCK = "select id, type from st_stock";
 	private final static String SELECT_ONE_STOCK = "select id, type from st_stock where id = '002646'";
+	
+	private final static String INSERT_CHIP_IN_LOG = "insert into st_chip_in_log(id, stock_id, log_date, weight) values(?,?,?,?)";
+	private final static String UPDATE_CHIP_IN_LOG = "update st_chip_in_log set high_profit=?, high_profit_day=?, low_profit=?, low_profit_day=? where id=?";
+	private final static String SELECT_UNDO_CHIP_IN_LOG = "select id, stock_id, log_date from st_chip_in_log where high_profit is null and log_date < ?";
 
 	private JdbcTemplate jdbcTemplate;
 
@@ -303,7 +309,7 @@ public class StockDaoImpl implements StockDao {
 		// DefaultGetHttpDataSource("http://hq.sinajs.cn/list=sh600755",
 		// paramMap, 3000);
 		DefaultGetHttpDataSource dataSource = new DefaultGetHttpDataSource(
-				"http://hq.sinajs.cn/list=" + paramValue, paramMap, 3000);
+				"http://hq.sinajs.cn/list=" + paramValue, paramMap, 10000);
 		dataSource.init();
 		HttpTemplate httpTemplate = new HttpTemplate(dataSource);
 		return httpTemplate
@@ -356,15 +362,19 @@ public class StockDaoImpl implements StockDao {
 		if (!list.isEmpty()) {
 			// 一阳包一阴
 //			this.processOne(list, 10, 5);
+			// 一阳包一阴，并且阳线低于阴线
+//			processSeventeen(list, 10, 5);
 			//一阴后一阳，并且阳线跳空高开
 //			this.processTwelve(list, 10, 5);
 //			一阴后一阳，并且阳线高于阴线
-			this.processFourteen(list, 10, 5);
-			// 一阳包一阴，一阴是十字星
+//			this.processFourteen(list, 10, 5);
+//			一阴后一阳，并且阳线低于阴线
+//			processSixteen(list, 10, 5);
+//			 一阳包一阴，一阴是十字星
 //			this.processSix(list, 10, 5, 0.125);
 			// 三连阳
 //			 this.processTwo(list, 10, 5);
-			// 四连阳
+//			 四连阳
 //			 this.processTen(list, 10, 5);
 			// 二连阳
 //			 this.processThree(list, 10, 5);
@@ -373,13 +383,15 @@ public class StockDaoImpl implements StockDao {
 			// 二连阳 并且是 两个十字星
 //			processSeven(list, 10, 5, 0.275);
 			//十字星
-			this.processFour(list, 10, 5, 0.276);
-			//十字星后一个阳线
-//			this.processThirteen(list, 10, 5, 0.265);
+//			this.processFour(list, 10, 5,  0.325);
+//			十字星后一个阳线
+//			this.processThirteen(list, 10, 5, 0.325);
 			//连续两个十字星
-//			processNine(list, 10, 5, 0.276);
+//			processNine(list, 10, 5, 0.325);
+			//阴线后一个十字星
+//			processFifteen(list, 5, 8, 0.325);
 			//连续三个十字星
-//			processEight(list, 10, 5, 0.276);
+			processEight(list, 10, 5, 0.38);
 //			 二连阳 一阳包一阳
 //			 processFive(list, 10, 5);
 		} else {
@@ -410,12 +422,18 @@ public class StockDaoImpl implements StockDao {
 //				this.processSix(list, 5, 8, 0.125);
 			// 一阳包一阴，一阴是十字星
 //				this.processSix(list, 5, 8, 0.125);
+			// 四连阳
+//			 this.processTen(list, 5, 8);
 			// 三连阳
 //			this.processTwo(list, 5, 8);
-			// 二连阳
-			 this.processThree(list, 5, 8);
+//			 二连阳
+//			 this.processThree(list, 5, 8);
 			//十字星
 //			this.processFour(list, 5, 8, 0.276);
+			//阴星后一个十字星
+			processFifteen(list, 5, 8, 0.276);
+			//十字星后一个阳线
+//			this.processThirteen(list, 5, 8, 0.375);
 //			 二连阳 一阳包一阳
 //			 processFive(list, 5, 8);
 		} else {
@@ -454,6 +472,8 @@ public class StockDaoImpl implements StockDao {
 				nextDayRange = list.get(i + 1).getRange();
 				// logger.info("currentDayRange is " + currentDayRange +
 				// " nextDayRange is " + nextDayRange);
+//				System.out.println(list.get(i).getHisDate());
+//				System.out.printf("currentDayRange is %d, nextDayRange is %d\n", currentDayRange, nextDayRange);
 				if (nextDayRange < 0) {
 					if (currentDayRange - (nextDayRange - (nextDayRange * 2)) >= 0) {
 						// logger.info(list.get(i).getHisDate());
@@ -958,7 +978,126 @@ public class StockDaoImpl implements StockDao {
 		}
 	}
 	
+	private void processFifteen(ArrayList<HisMarket> list, int endNum, int rose,
+			double limit) {
+		int size = list.size();
+		logger.info("list size is " + size);
+		for (int i = 0; i + 1 < size; i++) {
+			double limitPercent = list.get(i).getLimitPercent();
+//			double yesterdaylimitPercent = list.get(i + 1).getLimitPercent();
+			double yesterdayRange = list.get(i + 1).getRange();
+//			System.out.printf("%d,%f\n", list.get(i).getHisDate(),limitPercent);
+			if (limitPercent <= limit && yesterdayRange < 0) {
+				System.out.println(list.get(i).getHisDate());
+				int start = i;
+				int end = i - endNum;
+				for (int j = start; j > end && j >= 0; j--) {
+					double preClose = (double) list.get(j).getClose();
+					double curClose = (double) list.get(start).getClose();
+					// System.out.printf("%d,%d,%d,%d\n",
+					// list.get(j).getClose(), list.get(start).getClose(),
+					// (list.get(j).getClose() -
+					// list.get(start).getClose()),((list.get(j).getClose() -
+					// list.get(start).getClose())/list.get(j).getClose()));
+					if (((preClose - curClose) / preClose) * 100 > rose) {
+						System.out.println("up yes");
+						break;
+					}
+				}
+			}
+		}
+	}
 	
+	private void processSixteen(ArrayList<HisMarket> list, int endNum, int rose) {
+		int size = list.size();
+		logger.info("list size is " + size);
+		int currentDayRange = 0;
+		int nextDayRange = 0;
+		int currentClose = 0;
+		int nextDayClose = 0;
+		for (int i = 0; i + 1 < size; i++) {
+			currentDayRange = list.get(i).getRange();
+			currentClose = list.get(i).getClose();
+//			System.out.println(list.get(i).getHisDate());
+//			System.out.printf("currentDayRange:%d,currentClose:%d\n", currentDayRange, currentClose);
+			// logger.info("currentDayRange is " + currentDayRange);
+			if (currentDayRange > 0) {
+				nextDayRange = list.get(i + 1).getRange();
+				nextDayClose = list.get(i+ 1).getClose();
+				
+				if (nextDayRange < 0) {
+					
+					if (currentClose < nextDayClose) {
+						// logger.info(list.get(i).getHisDate());
+						System.out.println(list.get(i).getHisDate());
+						int start = i + 1;
+						int end = i + endNum;
+						start = i;
+						end = i - 10;
+						for (int j = start; j > end && j >= 0; j--) {
+							double preClose = (double) list.get(j).getClose();
+							double curClose = (double) list.get(start)
+									.getClose();
+							if (((preClose - curClose) / preClose) * 100 > rose) {
+								System.out.println("up yes");
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	private void processSeventeen(ArrayList<HisMarket> list, int endNum, int rose) {
+		int size = list.size();
+		logger.info("list size is " + size);
+		int currentDayRange = 0;
+		int nextDayRange = 0;
+		int currentDayClose = 0;
+		int nextDayClose = 0;
+		int nextDayOpen = 0;
+		for (int i = 0; i + 1 < size; i++) {
+			currentDayRange = list.get(i).getRange();
+			currentDayClose = list.get(i).getClose();
+			// logger.info("currentDayRange is " + currentDayRange);
+			if (currentDayRange > 0) {
+				nextDayRange = list.get(i + 1).getRange();
+				nextDayClose =  list.get(i + 1).getClose();
+				nextDayOpen = list.get(i + 1).getOpen();
+				// logger.info("currentDayRange is " + currentDayRange +
+				// " nextDayRange is " + nextDayRange);
+//				System.out.println(list.get(i).getHisDate());
+//				System.out.printf("currentDayRange is %d, nextDayRange is %d\n", currentDayRange, nextDayRange);
+				if (nextDayRange < 0) {
+					if (currentDayRange - (nextDayRange - (nextDayRange * 2)) >= 0 && currentDayClose > nextDayClose && currentDayClose < nextDayOpen) {
+						// logger.info(list.get(i).getHisDate());
+						System.out.println(list.get(i).getHisDate());
+						int start = i + 1;
+						int end = i + endNum;
+						start = i;
+						end = i - 10;
+						for (int j = start; j > end && j >= 0; j--) {
+							double preClose = (double) list.get(j).getClose();
+							double curClose = (double) list.get(start)
+									.getClose();
+							// System.out.printf("%d,%d,%d,%d\n",
+							// list.get(j).getClose(),
+							// list.get(start).getClose(),
+							// (list.get(j).getClose() -
+							// list.get(start).getClose()),((list.get(j).getClose()
+							// -
+							// list.get(start).getClose())/list.get(j).getClose()));
+							if (((preClose - curClose) / preClose) * 100 > rose) {
+								System.out.println("up yes");
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 
 	@Override
 	public void initHisMarketWeek(final String stockId, final int startDate,
@@ -1186,6 +1325,147 @@ public class StockDaoImpl implements StockDao {
 				}
 			}
 		}
+		
+	}
+
+	@Override
+	public void saveChipInLog(final String stockId, final int logDate, final String weight) {
+		this.jdbcTemplate.execute(new ConnectionCallback<String>(){
+
+			@Override
+			public String doInConnection(Connection con) throws SQLException,
+					DataAccessException {
+				PreparedStatement pstmt = con
+						.prepareStatement(INSERT_CHIP_IN_LOG);
+				pstmt.setString(1, stockId + "_" + logDate);
+				pstmt.setString(2, stockId);
+				pstmt.setInt(3, logDate);
+				pstmt.setString(4, weight);
+				pstmt.executeUpdate();
+				con.commit();
+				return null;
+			}
+			
+		} );
+		
+	}
+
+	@Override
+	public void saveChipInLogs(final List<ChipInLog> logList) {
+		this.jdbcTemplate.execute(new ConnectionCallback<String>(){
+
+			@Override
+			public String doInConnection(Connection con) throws SQLException,
+					DataAccessException {
+				PreparedStatement pstmt = con
+						.prepareStatement(INSERT_CHIP_IN_LOG);
+				for (ChipInLog log : logList) {
+					pstmt.setString(1,log.getId());
+					pstmt.setString(2, log.getStockId());
+					pstmt.setInt(3, log.getLogDate());
+					pstmt.setString(4, log.getWeight());
+					pstmt.addBatch();
+				}
+				pstmt.executeBatch();
+				con.commit();
+				return null;
+			}
+			
+		} );
+		
+	}
+
+	@Override
+	public void processUndoChipInLog() {
+		this.jdbcTemplate.execute(new ConnectionCallback<String>(){
+
+			@Override
+			public String doInConnection(Connection con) throws SQLException,
+					DataAccessException {
+				int day = DateUtil.getCurrentStartDate(10);
+				PreparedStatement pstmt = con
+						.prepareStatement(SELECT_UNDO_CHIP_IN_LOG);
+				pstmt.setInt(1, day);
+				ResultSet rs = pstmt.executeQuery();
+				List<ChipInLog> logList = new ArrayList<ChipInLog>();
+				while (rs.next()) {
+					ChipInLog chipInLog = new ChipInLog();
+					chipInLog.setId(rs.getString(1));
+					chipInLog.setStockId(rs.getString(2));
+					chipInLog.setLogDate(rs.getInt(3));
+					logList.add(chipInLog);
+				}
+				rs.close();
+				pstmt.close();
+				if (!logList.isEmpty()) {
+					System.out.printf("logList size is %d\n", logList.size());
+					List<UpdateChipInLog> updateList = new ArrayList<UpdateChipInLog>();
+					for (ChipInLog chipInLog : logList) {
+						int startDate = chipInLog.getLogDate();
+						int endDate = DateUtil.getWorkEndDate(startDate, 10);
+						String stockId = chipInLog.getStockId();
+						System.out.printf("stockId:%s,startDate:%d,endDate:%d\n", stockId, startDate, endDate);
+						pstmt = con
+								.prepareStatement(SELECT_HIS_MARKET_RANGE_ASC);
+						pstmt.setString(1, stockId);
+						pstmt.setInt(2, startDate);
+						pstmt.setInt(3, endDate);
+						rs = pstmt.executeQuery();
+						ArrayList<HisMarket> list = StockDaoImpl.this.getHisMarketList(rs);
+						rs.close();
+						pstmt.close();
+						if (!list.isEmpty()) {
+//							System.out.printf("list size is %d\n", list.size());
+							int startDateOpen = list.get(0).getOpen();
+							int high = 0;
+							int low = 0;
+							int highDay = 0;
+							int lowDay = 0;
+							int dayNum = 0;
+							for (HisMarket hisMarket : list) {
+								dayNum++;
+								int dt = hisMarket.getHigh() - startDateOpen;
+								if (dt > high) {
+									high = dt;
+									highDay = dayNum;
+								}
+								if (dt < low) {
+									low = dt;
+									lowDay = dayNum;
+								}
+							}
+							UpdateChipInLog updateChipInLog = new UpdateChipInLog();
+							updateChipInLog.setId(chipInLog.getId());
+//							System.out.println((high));
+							updateChipInLog.setHighProfit((int)(((double)(high)/(double)startDateOpen)*100));
+							updateChipInLog.setHighProfitDay(highDay);
+							updateChipInLog.setLowProfit((int)(((double)(low)/(double)startDateOpen)*100));
+							updateChipInLog.setLowProfitDay(lowDay);
+							System.out.printf("HighProfit is %d, HighProfitDay is %d, LowProfit is %d, LowProfitDay is %d\n", updateChipInLog.getHighProfit(), updateChipInLog.getHighProfitDay(), updateChipInLog.getLowProfit(), updateChipInLog.getLowProfitDay());
+							updateList.add(updateChipInLog);
+						}
+					}
+					if (!updateList.isEmpty()) {
+						System.out.printf("updateList size is %d\n", updateList.size());
+						pstmt = con
+								.prepareStatement(UPDATE_CHIP_IN_LOG);
+						for (UpdateChipInLog updateLog : updateList) {
+							pstmt.setInt(1, updateLog.getHighProfit());
+							pstmt.setInt(2, updateLog.getHighProfitDay());
+							pstmt.setInt(3, updateLog.getLowProfit());
+							pstmt.setInt(4, updateLog.getLowProfitDay());
+							pstmt.setString(5, updateLog.getId());
+							pstmt.addBatch();
+						}
+						pstmt.executeBatch();
+						pstmt.close();
+						con.commit();
+					}
+				}
+				return null;
+			}
+			
+		} );
 		
 	}
 

@@ -54,6 +54,34 @@ public class DateUtil {
 		return getYMDInt(cal);
 	}
 	
+	public final static int getWorkEndDate(int startDate, int dayNum) {
+		int year = startDate/10000;
+		int month = (startDate - year*10000)/100;
+		int day = startDate - year*10000 - month*100;
+		Calendar cal = Calendar.getInstance();
+		cal.set(Calendar.YEAR, year);
+		cal.set(Calendar.MONTH, month - 1);
+		cal.set(Calendar.DAY_OF_MONTH, day);
+		for (int i=0; i<dayNum;) {
+			cal.add(Calendar.DATE, 1);
+			if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY || cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) {
+//				System.out.println(getYMDInt(cal));
+				continue;
+			} else {
+//				System.out.println(getYMDInt(cal));
+				i++;
+			}
+		}
+		return getYMDInt(cal);
+	}
+	
+	public final static int getCurrentStartDate(int dayNum) {
+		Calendar cal = Calendar.getInstance();
+		int endDate = getYMDInt(cal);
+		int startDate = getStartDate(endDate, dayNum);
+		return startDate;
+	}
+	
 	private final static int[] getYMD(int date) {
 		int year = date/10000;
 		int month = (date - year*10000)/100;
